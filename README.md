@@ -98,6 +98,47 @@ npm install google-auth-library
 | `picture`       | Profile picture URL                             |
 | `tokens`        | Object containing `access_token`, `id_token`, `refresh_token` (if any), etc. from Google |
 
+## AJAX / Popup-based Login (Optional)
+
+By default, `/auth/google/callback` is a real page the browser navigates to — so whatever you send in the response (e.g. `res.json(profile)`) is what the user visibly sees, with no automatic redirect.
+
+If you don't want the main page to reload or navigate away at all, open the login flow in a **popup window** instead, and have the callback route send back an HTML page that posts the result to the main window via `postMessage`, then closes itself. Use `renderPopupCallback()` for this.
+
+**Backend (callback route):**
+
+```js
+app.get('/auth/google/callback', async (req, res) => {
+  try {
+    const profile = await googleAuth.handleCallback(req.query.code);
+    // set 'http://localhost:3000' to your frontend's exact origin in production
+    res.send(googleAuth.renderPopupCallback(profile, 'http://localhost:3000'));
+  } catch (err) {
+    res.status(401).send('Login failed');
+  }
+});
+```
+
+**Frontend (vanilla JS example):**
+
+```js
+function loginWithGoogle() {
+  const popup = window.open('/auth/google', 'googleLogin', 'width=500,height=600');
+
+  window.addEventListener('message', function handler(event) {
+    if (event.data && event.data.type === 'google-auth-success') {
+      window.removeEventListener('message', handler);
+      popup.close();
+
+      const profile = event.data.profile;
+      console.log('Logged in as', profile);
+      // update UI, store token/session, etc. — no page reload needed
+    }
+  });
+}
+```
+
+With this setup, the user clicks a button, a small popup handles the Google login, and the main page updates instantly once the popup sends its message back — no blank page, no full redirect on the main window.
+
 ## Before Pushing to GitHub
 
 This module stores the Client ID and Client Secret hardcoded in the file (not via `.env`), so the file can be copy-pasted into any project without any extra setup.

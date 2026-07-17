@@ -49,6 +49,10 @@
  *  -----------
  *    npm install google-auth-library
  *
+ *  Need a popup/AJAX-based login instead (no full-page reload on the
+ *  main window)? See `renderPopupCallback()` below, and the "AJAX /
+ *  Popup-based Login" section in README.md.
+ *
  * ============================================================
  */
 
@@ -152,7 +156,40 @@ async function handleCallback(code) {
   };
 }
 
+/**
+ * Render an HTML page that posts the profile data back to the window
+ * that opened this popup, then closes itself.
+ *
+ * Use this in your callback route INSTEAD OF res.json(profile) when
+ * your frontend opens the login flow in a popup window (AJAX-style
+ * login: the main page never navigates away or reloads).
+ *
+ * @param {object} profile - the profile object returned by handleCallback()
+ * @param {string} [targetOrigin] - origin allowed to receive the message.
+ *   Defaults to '*'. In production, set this to your frontend's exact
+ *   origin (e.g. 'https://yourapp.com') to prevent other sites from
+ *   reading the message.
+ * @returns {string} HTML string, send it with res.send(html)
+ */
+function renderPopupCallback(profile, targetOrigin) {
+  const origin = targetOrigin || '*';
+  const payload = JSON.stringify({ type: 'google-auth-success', profile });
+
+  return `<!DOCTYPE html>
+<html>
+  <body>
+    <script>
+      if (window.opener) {
+        window.opener.postMessage(${payload}, ${JSON.stringify(origin)});
+      }
+      window.close();
+    </script>
+  </body>
+</html>`;
+}
+
 module.exports = {
   getAuthUrl,
   handleCallback,
+  renderPopupCallback,
 };
